@@ -1,22 +1,86 @@
-FROM ubuntu:disco
+FROM alpine:edge
 
-RUN apt-get update
-RUN apt-get upgrade -y
-RUN apt-get install -y avahi-daemon
+RUN apk --no-cache add --virtual=deps1 \
+        alsa-lib-dev \
+        autoconf \
+        automake \
+        cmake \
+        avahi-dev \
+        bash \
+        bsd-compat-headers \
+        build-base \
+        confuse-dev \
+        curl \
+        curl-dev \
+        ffmpeg-dev \
+        file \
+        git \
+        gnutls-dev \
+        gperf \
+        json-c-dev \
+        libevent-dev \
+        libgcrypt-dev \
+        libplist-dev \
+        libsodium-dev \
+        libtool \
+        libunistring-dev \
+        openjdk7-jre-base \
+        protobuf-c-dev \
+        sqlite-dev \
+ && apk add --no-cache --virtual=deps2 --repository http://nl.alpinelinux.org/alpine/edge/testing \
+        libantlr3c-dev \
+        mxml-dev \
+ && apk add --no-cache \
+        avahi \
+        confuse \
+        dbus \
+        ffmpeg \
+        json-c \
+        libcurl \
+        libevent \
+        libgcrypt \
+        libplist \
+        libsodium \
+        libunistring \
+        protobuf-c \
+        sqlite \
+        sqlite-libs \
+        openssl \
+ && apk add --no-cache --repository http://nl.alpinelinux.org/alpine/edge/testing \
+        libantlr3c \
+        mxml \
+ && curl -L -o /tmp/antlr-3.4-complete.jar http://www.antlr3.org/download/antlr-3.4-complete.jar \
+ && echo '#!/bin/bash' > /usr/local/bin/antlr3 \
+ && echo 'exec java -cp /tmp/antlr-3.4-complete.jar org.antlr.Tool "$@"' >> /usr/local/bin/antlr3 \
+ && chmod 775 /usr/local/bin/antlr3 \
+ && cd /tmp \
+ && git clone https://github.com/warmcat/libwebsockets.git \
+ && cd /tmp/libwebsockets \
+ && cmake ./ \
+ && make install \
+ && cd /tmp \
+ && git clone https://github.com/ejurgensen/forked-daapd.git \
+ && cd /tmp/forked-daapd \
+ && autoreconf -i \
+ && ./configure \
+      --enable-itunes \
+      --enable-mpd \
+      --enable-lastfm \
+      --enable-chromecast \
+ && make \
+ && make install \
+ && apk del --purge deps1 deps2 \
+ && rm -rf /usr/local/bin/antlr3 /tmp/* \
+ && cd /usr/local/etc \
+ && sed -i -e 's/\(uid.*=.*\)/uid = "root"/g' forked-daapd.conf \
+ && sed -i s#"ipv6 = yes"#"ipv6 = no"#g forked-daapd.conf \
+ && sed -i s#/srv/music#/music#g forked-daapd.conf \
+ && sed -i s#/usr/local/var/cache/forked-daapd/songs3.db#/config/cache/songs3.db#g forked-daapd.conf \
+ && sed -i s#/usr/local/var/cache/forked-daapd/cache.db#/config/cache/cache.db#g forked-daapd.conf \
+ && sed -i s#/usr/local/var/log/forked-daapd.log#/dev/stdout#g forked-daapd.conf \
+ && sed -i "/db_path\ =/ s/# *//" forked-daapd.conf \
+ && sed -i "/cache_path\ =/ s/# *//" forked-daapd.conf
 
-RUN apt-get install -y \
-  build-essential git autotools-dev autoconf automake libtool gettext gawk \
-  gperf antlr3 libantlr3c-dev libconfuse-dev libunistring-dev libsqlite3-dev \
-  libavcodec-dev libavformat-dev libavfilter-dev libswscale-dev libavutil-dev \
-  libasound2-dev libmxml-dev libgcrypt20-dev libavahi-client-dev zlib1g-dev \
-  libevent-dev libplist-dev libsodium-dev libjson-c-dev libwebsockets-dev
-
-RUN git clone https://github.com/ejurgensen/forked-daapd.git \
-  && cd forked-daapd \
-  && autoreconf -i \
-  && ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
-  && make \
-  && make install
 
 # Run container
 ADD image/run.sh /root/run.sh
